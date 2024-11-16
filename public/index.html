@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kafe a Node.js</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2/dist/vue.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.1.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+        }
+        #form label {
+            width: 5rem;
+            display: inline-block;
+        }
+        #form label.userLabel {
+            width: 10rem;
+        }
+        #output1 {
+            margin-top: 20px;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <header>
+            <h1>Kafe a Node.js</h1>
+        </header>
+
+        <main>
+            <form @submit.prevent="submitForm">
+                <section id="form">
+                    <div v-for="type in typesList" :key="type.typ">
+                        <label :for="type.typ">{{ type.typ }}</label>
+                        <b :id="'count' + type.typ">0</b>
+                        <input type="range" class="range" v-model="type.value" min="0" max="10" @input="updateTextInput(type)"><br>
+                    </div>
+                    <div v-for="person in peopleList" :key="person.ID">
+                        <input type="radio" :id="person.name" name="user" :value="person.ID" v-model="selectedUser" required>
+                        <label :for="person.name" class="userLabel">{{ person.name }}</label><br>
+                    </div>
+                </section>
+                <input type="submit" value="Odeslat">
+            </form>
+            <p id="output1">{{ outputMessage }}</p>
+        </main>
+    </div>
+
+    <footer>
+        <script src="js.js"></script>
+    </footer>
+
+    <script>
+        new Vue({
+            el: '#app',
+            data: {
+                typesList: [],
+                peopleList: [],
+                selectedUser: null,
+                outputMessage: ''
+            },
+            methods: {
+                updateTextInput(type) {
+                    document.getElementById('count' + type.typ).innerHTML = type.value;
+                },
+                async fetchData() {
+                    try {
+                        const url = "http://localhost:3000/request";
+                        const typesResponse = await $.getJSON(`${url}?cmd=getTypesList`);
+                        const peopleResponse = await $.getJSON(`${url}?cmd=getPeopleList`);
+
+                        if (typesResponse.output) {
+                            this.typesList = typesResponse.output.map(val => ({ ...val, value: 0 }));
+                        } else {
+                            this.handleError("No output in response", typesResponse);
+                        }
+
+                        if (peopleResponse.output) {
+                            this.peopleList = peopleResponse.output;
+                        } else {
+                            this.handleError("No output in response", peopleResponse);
+                        }
+                    } catch (error) {
+                        console.error("Error fetching data", error);
+                    }
+                },
+                handleError(message, data) {
+                    console.error(`Error: ${message}`, data);
+                },
+                async submitForm() {
+                    const typesSelected = this.typesList.some(type => type.value > 0);
+                    if (!typesSelected) {
+                        alert("Zvolte kolik čeho jste vypili");
+                        return;
+                    }
+                
+                    const url = "http://localhost:3000/request";
+                    
+                    const formData = {
+                        user: this.selectedUser,
+                        type: this.typesList.map(type => type.value)
+                    };
+                
+                    const encodedData = $.param(formData);
+                    
+                    try {
+                        const response = await $.post(`${url}?cmd=saveDrinks`, encodedData);
+                        if (response.error) {
+                            this.outputMessage = `Error: ${response.message}`;
+                        } else {
+                            this.outputMessage = "OK";
+                            this.resetForm();
+                        }
+                    } catch (error) {
+                        console.error("Error submitting form", error);
+                    }
+                },
+                resetForm() {
+                    this.typesList.forEach(type => type.value = 0);
+                    this.selectedUser = null;
+                }
+            },
+            mounted() {
+                this.fetchData();
+            }
+        });
+    </script>
+</body>
+</html>
